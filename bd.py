@@ -1,4 +1,6 @@
 import sqlite3
+import pytz
+from datetime import datetime
 
 # Функции Базы данных
 
@@ -6,7 +8,7 @@ def create_db(message):
     try:
         connection = sqlite3.connect("{}.db".format(message.chat.id), check_same_thread = True)
         cursor = connection.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS cars (gosnum TEXT NOT NULL, km INTEGER);")  
+        cursor.execute("CREATE TABLE IF NOT EXISTS cars (gosnum TEXT NOT NULL, km INTEGER, vari INTEGER);")  
         cursor.execute("CREATE TABLE IF NOT EXISTS drivers (name TEXT NOT NULL, birthday TEXT, insurance TEXT, debt REAL DEFAULT 0, gosnum TEXT, FOREIGN KEY (gosnum) REFERENCES car(gosnum));")
         cursor.execute("CREATE TABLE IF NOT EXISTS trans (name TEXT, date TEXT, refill TEXT, state_debt REAL);")
         connection.commit()
@@ -14,6 +16,18 @@ def create_db(message):
         print(sqlite3.Error)
     finally:
         connection.close()
+
+# def update(message):
+#         try:
+#             connection = sqlite3.connect("{}.db".format(message.chat.id), check_same_thread = True)
+#             cursor = connection.cursor()
+#             cursor.execute("DROP TABLE IF EXISTS cars;")
+#             cursor.execute("CREATE TABLE IF NOT EXISTS cars (gosnum TEXT NOT NULL, km INTEGER, vari INTEGER);")
+#             connection.commit()
+#         except sqlite3.Error:
+#             print(sqlite3.Error)
+#         finally:
+#             connection.close()
 
 
 def delete_one_row(message, row):
@@ -45,7 +59,7 @@ def fill_row_car(message, row):
     try:
         connection = sqlite3.connect("{}.db".format(message.chat.id), check_same_thread = True)
         cursor = connection.cursor()
-        cursor.execute("INSERT INTO cars (gosnum, km) VALUES (?,?);", tuple(row.values()))
+        cursor.execute("INSERT INTO cars (gosnum, km, vari) VALUES (?,?,?);", tuple(row.values()))
         connection.commit()
     except sqlite3.Error:
         print(sqlite3.Error)
@@ -145,7 +159,7 @@ def make_trans(message, data):
     try:
         connection = sqlite3.connect("{}.db".format(message.chat.id), check_same_thread = True)
         cursor = connection.cursor()
-        time = str(cursor.execute("SELECT strftime('%d.%m %H:%M', 'now','localtime');").fetchall()[0]).strip("[](),''")
+        time = datetime.now(pytz.timezone('Asia/Vladivostok')).strftime('%d.%m %H:%M')
         debt = cursor.execute("SELECT debt FROM drivers WHERE name=?;", (data['name'],)).fetchall()[0][0]
 
         if data['sign'] == '+':
@@ -165,7 +179,10 @@ def make_new_km(message, data):
     try:
         connection = sqlite3.connect("{}.db".format(message.chat.id), check_same_thread = True)
         cursor = connection.cursor()
-        cursor.execute("UPDATE cars SET km=? WHERE gosnum=?;", (data['km'], data['number']))
+        if data['vari'] == 'Нет':
+            cursor.execute("UPDATE cars SET km=? WHERE gosnum=?;", (data['km'], data['number']))
+        elif data['vari'] == 'Да':
+            cursor.execute("UPDATE cars SET km=?, vari=? WHERE gosnum=?;", (data['km'], data['km']+42000, data['number']))
         connection.commit()
     except sqlite3.Error:
         print(sqlite3.Error)
@@ -237,6 +254,18 @@ def check_ins(message):
         connection = sqlite3.connect("{}.db".format(message.chat.id), check_same_thread = True)
         cursor = connection.cursor()
         result = cursor.execute("SELECT insurance, name FROM drivers;").fetchall()
+        return result
+    except sqlite3.Error:
+        print(sqlite3.Error)
+    finally:       
+        connection.close()
+
+
+def check_birth(message):
+    try:
+        connection = sqlite3.connect("{}.db".format(message.chat.id), check_same_thread = True)
+        cursor = connection.cursor()
+        result = cursor.execute("SELECT birthday, name FROM drivers;").fetchall()
         return result
     except sqlite3.Error:
         print(sqlite3.Error)
